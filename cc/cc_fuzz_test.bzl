@@ -20,6 +20,7 @@ Which fuzzing engine is used is determined by Bazel command line flags.
 Currently supported engines:
   * libfuzzer
 """
+
 def cc_fuzz_test(
         fuzzing_dict = None,
         corpus = None,
@@ -87,19 +88,9 @@ def cc_fuzz_test(
     # )
 
     native.cc_test(
-        deps = deps
-        # + select({
-            # Add more engines here.
-            # "//security/fuzzing/blaze:use_libfuzzer": ["//security/fuzzing/blaze:libfuzzer_engine"],
-            # "//conditions:default": ["//security/fuzzing/blaze:unittest_engine"],
-        # })
-        ,
-        data = data + fuzzing_dict + corpus
-          # + ["//security/fuzzing/blaze:default_corpus"]
-          ,
-        # tags = cc_fuzz_tags,
+        deps = deps,
+        data = data + fuzzing_dict + corpus,
         stamp = 0,
-        linkstatic = 1,  # For easier deployment.
+        linkstatic = 1,
         **kwargs
     )
-
