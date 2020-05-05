@@ -71,11 +71,14 @@ def _impl(ctx):
         tool_path(name = "strip", path = "/usr/bin/strip"),
     ]
 
-    action_configs = [
+    action_configs =  [
         action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang")])
-        for name in all_compile_actions
+        for name in [ACTION_NAMES.c_compile]
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang")])
+        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang++")])
+        for name in all_cpp_compile_actions
+    ] + [
+        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang++")])
         for name in all_link_actions
     ] + [
         action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/ar")])
