@@ -1,0 +1,2 @@
+build --crosstool_top=//toolchain:toolchain
+build --host_crosstool_top=//toolchain:toolchain
