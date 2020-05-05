@@ -3,7 +3,9 @@
 Super experimental!
 
 This is a somewhat naive attempt at writing a minimal yet useful clang C++
-toolchain for Bazel.
+toolchain for Bazel. It hardcodes a lot (e.g. clang at /usr/bin/clang,
+`cxx_builtin_include_directories` used for header validation are hardcoded to
+various directories I found useful and you will likely need to change/add more).
 
 To build examples, you only have to run:
 
