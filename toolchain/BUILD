@@ -29,6 +29,7 @@ cc_toolchain(
     supports_param_files = 1,
     toolchain_config = ":local",
     toolchain_identifier = "local",
+    module_map = "@system_module_map//:module.modulemap",
 )
 
 cc_toolchain_config(

@@ -71,10 +71,11 @@ def _impl(ctx):
         tool_path(name = "strip", path = "/usr/bin/strip"),
     ]
 
-    action_configs =  [
+    action_configs = [
         action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang")])
         for name in [ACTION_NAMES.c_compile]
     ] + [
+        # action_config(action_name = name, enabled = True, tools = [tool(path = "header_parsing_wrapper.sh")])
         action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang++")])
         for name in all_cpp_compile_actions
     ] + [
@@ -565,6 +566,69 @@ def _impl(ctx):
         ],
     )
 
+    use_module_maps = feature(
+        name = "use_module_maps",
+        requires = [feature_set(features = ["module_maps"])],
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                    ACTION_NAMES.cpp_header_parsing,
+                    ACTION_NAMES.cpp_module_compile,
+                ],
+                flag_groups = [
+                    # These flag groups are separate so they do not expand to
+                    # the cross product of the variables.
+                    flag_group(flags = ["-fmodule-name=%{module_name}"]),
+                    flag_group(
+                        flags = ["-fmodule-map-file=%{module_map_file}"],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    # Tell blaze we support module maps in general, so they will be generated
+    # for all c/c++ rules.
+    # Note: not all C++ rules support module maps; thus, do not imply this
+    # feature from other features - instead, require it.
+    module_maps = feature(
+        name = "module_maps",
+        enabled = True,
+        implies = [
+            # "module_map_home_cwd",
+            # "module_map_without_extern_module",
+            # "generate_submodules",
+        ],
+    )
+
+    layering_check = feature(
+        name = "layering_check",
+        implies = ["use_module_maps"],
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                    ACTION_NAMES.cpp_header_parsing,
+                    ACTION_NAMES.cpp_module_compile,
+                ],
+                flag_groups = [
+                    flag_group(flags = [
+                        "-fmodules-strict-decluse",
+                        "-Wprivate-header",
+                    ]),
+                    flag_group(
+                        iterate_over = "dependent_module_map_files",
+                        flags = [
+                            "-fmodule-map-file=%{dependent_module_map_files}",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
     fuzzer = feature(
         name = "fuzzer",
         flag_sets = [
@@ -599,6 +663,9 @@ def _impl(ctx):
         feature(name = "opt"),
         sysroot_feature,
         fuzzer,
+        module_maps,
+        layering_check,
+        use_module_maps,
     ]
 
     return cc_common.create_cc_toolchain_config_info(
