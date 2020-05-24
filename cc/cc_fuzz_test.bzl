@@ -90,6 +90,7 @@ def cc_fuzz_test(
     native.cc_test(
         deps = deps,
         data = data + fuzzing_dict + corpus,
+        features = ["fuzzer"],
         stamp = 0,
         linkstatic = 1,
         **kwargs

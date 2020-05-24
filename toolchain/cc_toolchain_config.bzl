@@ -58,34 +58,44 @@ all_link_actions = [
 ]
 
 def _impl(ctx):
+    # Rather than hard coding, I'd like to compute these by searching the PATH
+    # for `clang`, and then the dirname of that path to compute `llvm_bindir`.
+    # Then I would compute `llvm_prefix` as `llvm_bindir + "/.."`. But I don't
+    # know how to get at PATH-based search for the first, and the builtin
+    # includes below want the prefix to not have `/../` sequences in it which
+    # would require either manually resolving them (which could be wrong but
+    # preserves more symlinks) or using realpath.
+    llvm_prefix = "/usr/local/google/home/chandlerc"
+    llvm_bindir = llvm_prefix + "/bin"
+
     tool_paths = [
-        tool_path(name = "ar", path = "/usr/bin/ar"),
-        tool_path(name = "ld", path = "/usr/bin/ld"),
-        tool_path(name = "cpp", path = "/usr/bin/cpp"),
-        tool_path(name = "gcc", path = "/usr/bin/clang"),
-        tool_path(name = "dwp", path = "/usr/bin/dwp"),
-        tool_path(name = "gcov", path = "/usr/bin/gcov"),
-        tool_path(name = "nm", path = "/usr/bin/nm"),
-        tool_path(name = "objcopy", path = "/usr/bin/objcopy"),
-        tool_path(name = "objdump", path = "/usr/bin/objdump"),
-        tool_path(name = "strip", path = "/usr/bin/strip"),
+        tool_path(name = "ar", path = llvm_bindir + "/llvm-ar"),
+        tool_path(name = "ld", path = llvm_bindir + "/ld.lld"),
+        tool_path(name = "cpp", path = llvm_bindir + "/clang-cpp"),
+        tool_path(name = "gcc", path = llvm_bindir + "/clang"),
+        tool_path(name = "dwp", path = llvm_bindir + "/llvm-dwp"),
+        tool_path(name = "gcov", path = llvm_bindir + "/llvm-cov"),
+        tool_path(name = "nm", path = llvm_bindir + "/llvm-nm"),
+        tool_path(name = "objcopy", path = llvm_bindir + "/llvm-objcopy"),
+        tool_path(name = "objdump", path = llvm_bindir + "/llvm-objdump"),
+        tool_path(name = "strip", path = llvm_bindir + "/llvm-strip"),
     ]
 
     action_configs = [
-        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang")])
+        action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/clang")])
         for name in [ACTION_NAMES.c_compile]
     ] + [
         # action_config(action_name = name, enabled = True, tools = [tool(path = "header_parsing_wrapper.sh")])
-        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang++")])
+        action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/clang++")])
         for name in all_cpp_compile_actions
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/clang++")])
+        action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/clang++")])
         for name in all_link_actions
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/ar")])
+        action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/llvm-ar")])
         for name in [ACTION_NAMES.cpp_link_static_library]
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = "/usr/bin/strip")])
+        action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/llvm-strip")])
         for name in [ACTION_NAMES.strip]
     ]
 
@@ -98,13 +108,11 @@ def _impl(ctx):
                 flag_groups = ([
                     flag_group(
                         flags = [
-                            "-U_FORTIFY_SOURCE",
-                            "-fstack-protector",
                             "-Wall",
+                            "-Wextra",
                             "-Wthread-safety",
                             "-Wself-assign",
                             "-fcolor-diagnostics",
-                            "-fno-omit-frame-pointer",
                         ],
                     ),
                 ]),
@@ -240,11 +248,13 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-g0",
-                            "-O2",
-                            "-D_FORTIFY_SOURCE=1",
+                            "-O3",
                             "-DNDEBUG",
                             "-ffunction-sections",
                             "-fdata-sections",
+                            # Even when optimizing, preserve frame pointers for profiling.
+                            "-fno-omit-frame-pointer",
+                            "-mno-omit-leaf-frame-pointer",
                         ],
                     ),
                 ]),
@@ -256,8 +266,7 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-std=c++17",
-                            # "-stdlib=libc++",
-                            # "-isystem/usr/lib/libcxx-google/include/c++/v1",
+                            "-stdlib=libc++",
                         ],
                     ),
                 ]),
@@ -277,7 +286,7 @@ def _impl(ctx):
                 flag_groups = ([
                     flag_group(
                         flags = [
-                            # "-no-canonical-prefixes",
+                            "-no-canonical-prefixes",
                             "-Wno-builtin-macro-redefined",
                             "-D__DATE__=\"redacted\"",
                             "-D__TIMESTAMP__=\"redacted\"",
@@ -356,11 +365,18 @@ def _impl(ctx):
                 flag_groups = ([
                     flag_group(
                         flags = [
-                            # "-stdlib=libc++",
                             "-fuse-ld=lld",
                             "-Wl,-no-as-needed",
-                            # "-L/usr/lib/libcxx-google/lib/",
-                            # "-Wl,-rpath,/usr/lib/libcxx-google/lib/",
+                            # Force the C++ standard library to be statically
+                            # linked. This works even with libc++ despite the
+                            # name, however we have to manually link the ABI
+                            # library and libunwind.
+                            "-static-libstdc++",
+                            # Link with libc++.
+                            "-stdlib=libc++",
+                            # Link with Clang's runtime library. This is always
+                            # linked statically.
+                            #"-rtlib=compiler-rt",
                         ],
                     ),
                 ]),
@@ -573,7 +589,7 @@ def _impl(ctx):
             flag_set(
                 actions = [
                     ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
+                    ACTION_NAMES.Cpp_compile,
                     ACTION_NAMES.cpp_header_parsing,
                     ACTION_NAMES.cpp_module_compile,
                 ],
@@ -589,7 +605,7 @@ def _impl(ctx):
         ],
     )
 
-    # Tell blaze we support module maps in general, so they will be generated
+    # Tell bazel we support module maps in general, so they will be generated
     # for all c/c++ rules.
     # Note: not all C++ rules support module maps; thus, do not imply this
     # feature from other features - instead, require it.
@@ -640,6 +656,16 @@ def _impl(ctx):
                     ),
                 ],
             ),
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = ([
+                    flag_group(
+                        flags = [
+                            "-static-libsan",
+                        ],
+                    ),
+                ]),
+            ),
         ],
     )
 
@@ -673,18 +699,13 @@ def _impl(ctx):
         features = features,
         action_configs = action_configs,
         cxx_builtin_include_directories = [
-            # "/usr/lib/libcxx-google/include/c++/v1",
-            "/usr/lib/clang-google/lib/clang/10.0.0/include",
+            llvm_prefix + "/lib64/clang/11.0.0/include",
+            llvm_prefix + "/include/c++/v1",
+            llvm_prefix + "/include",
             "/usr/local/include",
-            "/usr/lib/llvm-9/lib/clang/9.0.1/include",
             "/usr/include/x86_64-linux-gnu",
             "/usr/include",
-            "/usr/lib/llvm-9/lib/clang/9.0.1/share",
-            "/usr/include/c++/9",
-            "/usr/include/x86_64-linux-gnu/c++/9",
-            "/usr/include/c++/9/backward",
-            "/usr/include/clang/9.0.1/include",
-            "/usr/lib/clang-google/lib/clang/10.0.0/share/asan_blacklist.txt",
+            llvm_prefix + "/lib64/clang/11.0.0/share/asan_blacklist.txt",
         ],
         toolchain_identifier = "local",
         host_system_name = "local",
