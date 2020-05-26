@@ -1,4 +1,4 @@
-build --crosstool_top=//toolchain:toolchain
-build --host_crosstool_top=//toolchain:toolchain
+build --crosstool_top=@clang_configure//toolchain:toolchain
+build --host_crosstool_top=@clang_configure//toolchain:toolchain
 
 build:fuzzer --features=fuzzer

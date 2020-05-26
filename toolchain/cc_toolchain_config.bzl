@@ -58,14 +58,7 @@ all_link_actions = [
 ]
 
 def _impl(ctx):
-    # Rather than hard coding, I'd like to compute these by searching the PATH
-    # for `clang`, and then the dirname of that path to compute `llvm_bindir`.
-    # Then I would compute `llvm_prefix` as `llvm_bindir + "/.."`. But I don't
-    # know how to get at PATH-based search for the first, and the builtin
-    # includes below want the prefix to not have `/../` sequences in it which
-    # would require either manually resolving them (which could be wrong but
-    # preserves more symlinks) or using realpath.
-    llvm_prefix = "/usr/local/google/home/chandlerc"
+    llvm_prefix = ctx.attr.llvm_prefix
     llvm_bindir = llvm_prefix + "/bin"
 
     tool_paths = [
@@ -85,7 +78,6 @@ def _impl(ctx):
         action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/clang")])
         for name in [ACTION_NAMES.c_compile]
     ] + [
-        # action_config(action_name = name, enabled = True, tools = [tool(path = "header_parsing_wrapper.sh")])
         action_config(action_name = name, enabled = True, tools = [tool(path = llvm_bindir + "/clang++")])
         for name in all_cpp_compile_actions
     ] + [
@@ -589,7 +581,7 @@ def _impl(ctx):
             flag_set(
                 actions = [
                     ACTION_NAMES.c_compile,
-                    ACTION_NAMES.Cpp_compile,
+                    ACTION_NAMES.cpp_compile,
                     ACTION_NAMES.cpp_header_parsing,
                     ACTION_NAMES.cpp_module_compile,
                 ],
@@ -700,12 +692,14 @@ def _impl(ctx):
         action_configs = action_configs,
         cxx_builtin_include_directories = [
             llvm_prefix + "/lib64/clang/11.0.0/include",
+            llvm_prefix + "/lib/clang/11.0.0/include",
             llvm_prefix + "/include/c++/v1",
             llvm_prefix + "/include",
             "/usr/local/include",
             "/usr/include/x86_64-linux-gnu",
             "/usr/include",
             llvm_prefix + "/lib64/clang/11.0.0/share/asan_blacklist.txt",
+            llvm_prefix + "/lib/clang/11.0.0/share/asan_blacklist.txt",
         ],
         toolchain_identifier = "local",
         host_system_name = "local",
@@ -720,5 +714,8 @@ def _impl(ctx):
 
 cc_toolchain_config = rule(
     implementation = _impl,
+    attrs = {
+      "llvm_prefix": attr.string(mandatory = True),
+    },
     provides = [CcToolchainConfigInfo],
 )

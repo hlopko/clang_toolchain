@@ -12,3 +12,6 @@ http_archive(
 
 load(":generate_system_module_map.bzl", "generate_system_module_map")
 generate_system_module_map(name = "system_module_map")
+
+load("//:clang_configure.bzl", "clang_configure")
+clang_configure(name = "clang_configure")
